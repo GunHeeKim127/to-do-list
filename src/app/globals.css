@@ -545,7 +545,7 @@ body {
   opacity: 0.9;
 }
 /* ==========================================================================
-   4. Header & Responsive Sidebar Styles (추가할 코드)
+   4. Header & Responsive Sidebar
    ========================================================================== */
 
 /* 메인 영역 래퍼 */
@@ -556,7 +556,7 @@ body {
   min-width: 0;
 }
 
-/* 🔝 상단 헤더 */
+/* 상단 헤더 */
 .app-header {
   height: 60px;
   background: rgba(255, 255, 255, 0.85);
@@ -577,64 +577,627 @@ body {
   color: var(--text-main);
 }
 
-/* ☰ 햄버거 버튼 (데스크톱 기본 숨김) */
+/* --------------------------------------------------------------------------
+   햄버거 / 닫기 토글 버튼
+   -------------------------------------------------------------------------- */
+
 .hamburger-btn {
   display: none;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
   background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
   color: var(--text-main);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  transition: var(--transition-fast);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  z-index: 1101;
+  transition: background-color 0.2s ease;
 }
 
 .hamburger-btn:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(0, 0, 0, 0.06);
 }
 
-/* 📱 태블릿 / 모바일 오버레이 배경 */
+.hamburger-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 버튼 안의 3개 선 */
+.hamburger-line {
+  position: absolute;
+  left: 10px;
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+  transition:
+    top 0.25s ease,
+    transform 0.25s ease,
+    opacity 0.2s ease;
+}
+
+.line-top {
+  top: 13px;
+}
+
+.line-middle {
+  top: 20px;
+}
+
+.line-bottom {
+  top: 27px;
+}
+
+/* 열림 상태: ☰ → X */
+.hamburger-btn.is-open .line-top {
+  top: 20px;
+  transform: rotate(45deg);
+}
+
+.hamburger-btn.is-open .line-middle {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.hamburger-btn.is-open .line-bottom {
+  top: 20px;
+  transform: rotate(-45deg);
+}
+
+/* --------------------------------------------------------------------------
+   모바일 사이드바 오버레이
+   -------------------------------------------------------------------------- */
+
 .sidebar-overlay {
   display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(2px);
-  z-index: 99;
 }
 
-/* 📱 반응형 미디어 쿼리 (768px 이하 태블릿 및 모바일) */
-@media (max-width: 768px) {
-  .hamburger-btn {
-    display: block; /* 태블릿 해상도부터 햄버거 버튼 표시 */
+/* --------------------------------------------------------------------------
+   900px 이하: 사이드바를 화면 밖으로 숨김
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .app-layout {
+    min-width: 0;
+    width: 100%;
+    overflow-x: hidden;
   }
 
+  /* 햄버거 버튼 표시 */
+  .hamburger-btn {
+    display: inline-flex;
+  }
+
+  /*
+   * 핵심:
+   * 사이드바의 z-index는 버튼보다 낮게 둔다.
+   * 따라서 사이드바가 열려도 X 버튼이 로고에 가려지지 않는다.
+   */
   .sidebar {
-    position: fixed;
+    position: fixed !important;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 260px;
-    z-index: 100;
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    width: min(280px, 82vw) !important;
+    max-width: 82vw;
+    height: 100dvh;
+    padding: 30px 20px;
+    z-index: 1000;
+    transform: translateX(-105%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
-  /* 사이드바 열림 상태 */
+  /* 사이드바 열림 */
   .sidebar.open {
     transform: translateX(0);
   }
 
+  /*
+   * X 버튼은 헤더 안에 있으므로 항상 사이드바보다 위에 표시.
+   * 헤더 자체는 z-index 50이지만 버튼만 별도 stacking context에서
+   * 올리는 방식은 부모의 z-index를 넘을 수 없으므로,
+   * 사이드바보다 헤더가 위에 오도록 한다.
+   */
+  .app-header {
+    position: sticky;
+    z-index: 1050;
+  }
+
+  .hamburger-btn {
+    z-index: 1100;
+  }
+
+  /* 배경 오버레이 */
   .sidebar-overlay {
     display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(2px);
+    animation: sidebarOverlayIn 0.2s ease;
   }
-  
-  .main-content {
-    padding: 20px; /* 모바일/태블릿용 여백 조정 */
+
+  .main-wrapper {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0 !important;
+  }
+
+  .app-header {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .current-page-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-header,
+  .glass-card,
+  .kanban-board,
+  .timeline-container {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .kanban-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   640px 이하: 모바일
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .sidebar {
+    width: min(280px, 86vw) !important;
+    max-width: 86vw;
+  }
+
+  .app-header {
+    height: 56px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .hamburger-btn {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+
+  .hamburger-line {
+    left: 9px;
+    width: 22px;
+  }
+
+  .page-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.82rem;
+  }
+
+  .glass-card {
+    margin-left: 12px;
+    margin-right: 12px;
+    width: auto;
+  }
+
+  .kanban-board {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   사이드바 오버레이 등장 애니메이션
+   -------------------------------------------------------------------------- */
+
+@keyframes sidebarOverlayIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 모션 감소 설정을 사용하는 사용자 배려 */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .hamburger-line,
+  .sidebar-overlay {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   5. Fluid Responsive Components
+   화면 크기에 따라 카드/텍스트/간격이 자연스럽게 축소되도록 설정
+   ========================================================================== */
+
+/* 기본: 컨테이너가 화면보다 커지지 않도록 */
+.main-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 넓은 화면에서 조금씩 축소되는 공통 카드 */
+@media (max-width: 1200px) {
+  .main-content {
+    padding: 32px;
+  }
+
+  .glass-card,
+  .calendar-container {
+    padding: 20px;
+  }
+
+  .dashboard-grid {
+    gap: 18px;
+  }
+
+  .stat-widgets {
+    gap: 12px;
+  }
+
+  .five-days-grid {
+    gap: 10px;
+  }
+
+  .day-card {
+    padding: 13px;
+    min-height: 165px;
+  }
+
+  .kanban-board {
+    gap: 16px;
+  }
+
+  .kanban-column {
+    padding: 16px;
+  }
+}
+
+/* 태블릿 */
+@media (max-width: 900px) {
+  .main-content {
+    padding: 24px;
+  }
+
+  .page-title {
+    font-size: clamp(1.4rem, 3vw, 1.8rem);
+  }
+
+  .page-subtitle {
+    font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+  }
+
+  /* 대시보드 2열 */
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  /* 통계 카드가 좁아지면 3 → 2열 */
+  .stat-widgets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 5일 카드도 공간에 맞춰 축소 */
+  .five-days-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .day-card {
+    min-height: 150px;
+    padding: 12px;
+  }
+
+  .day-number {
+    font-size: 1.05rem;
+  }
+
+  .kanban-column {
+    min-height: 500px;
+    padding: 14px;
+  }
+
+  .column-title {
+    font-size: 1rem;
+  }
+
+  .task-card {
+    padding: 13px;
+  }
+
+  .task-title {
+    font-size: 0.9rem;
+  }
+
+  .calendar-container {
+    padding: 18px;
+  }
+
+  .calendar-cell {
+    min-height: 90px;
+    padding: 6px;
+  }
+
+  .weekday-header {
+    padding: 9px 4px;
+    font-size: 0.78rem;
+  }
+
+  .cell-date {
+    font-size: 0.78rem;
+  }
+
+  .timeline-bar {
+    font-size: 0.65rem;
+    padding: 3px 4px;
+  }
+}
+
+/* 작은 태블릿 / 큰 모바일 */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 18px;
+  }
+
+  .glass-card,
+  .calendar-container {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  /* 통계 카드는 1열 */
+  .stat-widgets {
+    grid-template-columns: 1fr;
+  }
+
+  /* 5일 일정도 2열 */
+  .five-days-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .day-card {
+    min-height: 135px;
+    padding: 10px;
+  }
+
+  .day-header {
+    padding-bottom: 7px;
+    margin-bottom: 7px;
+  }
+
+  .mini-task-item {
+    font-size: 0.7rem;
+    padding: 5px 6px;
+  }
+
+  /* Kanban은 2열 유지 */
+  .kanban-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+
+  .kanban-column {
+    min-height: 420px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .column-header {
+    margin-bottom: 14px;
+    padding-bottom: 9px;
+  }
+
+  .column-title {
+    font-size: 0.9rem;
+  }
+
+  .task-count {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+  }
+
+  .task-card {
+    padding: 11px;
+    border-radius: 10px;
+  }
+
+  .task-meta {
+    font-size: 0.68rem;
+  }
+
+  /* 캘린더 */
+  .calendar-container {
+    overflow-x: auto;
+  }
+
+  .calendar-grid {
+    min-width: 520px;
+  }
+
+  .calendar-cell {
+    min-height: 80px;
+  }
+}
+
+/* 모바일 */
+@media (max-width: 640px) {
+  .main-content {
+    padding: 12px;
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.78rem;
+  }
+
+  .glass-card,
+  .calendar-container {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  /* 일정 카드 1열 */
+  .five-days-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .day-card {
+    min-height: auto;
+    padding: 12px;
+  }
+
+  /* Kanban 1열 */
+  .kanban-board {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .kanban-column {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .kanban-tasks {
+    gap: 9px;
+  }
+
+  .task-card {
+    padding: 10px;
+  }
+
+  .task-title {
+    font-size: 0.85rem;
+  }
+
+  /* 폼/버튼 */
+  .form-input,
+  .form-select {
+    padding: 9px 10px;
+    font-size: 0.84rem;
+  }
+
+  .btn-primary {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+  }
+
+  /* 모달이 모바일 화면 밖으로 나가지 않도록 */
+  .modal-content {
+    width: calc(100vw - 24px);
+    max-width: 440px;
+    padding: 18px;
+  }
+
+  /* 캘린더는 너무 작게 찌그러뜨리지 않고 가로 스크롤 */
+  .calendar-container {
+    overflow-x: auto;
+  }
+
+  .calendar-grid {
+    min-width: 500px;
+  }
+
+  .calendar-cell {
+    min-height: 70px;
+    padding: 5px;
+  }
+
+  .weekday-header {
+    padding: 7px 2px;
+    font-size: 0.7rem;
+  }
+
+  .cell-date {
+    font-size: 0.72rem;
+  }
+
+  .cell-date.today {
+    width: 20px;
+    height: 20px;
+  }
+
+  .timeline-bar {
+    font-size: 0.6rem;
+    padding: 2px 3px;
+  }
+}
+
+/* 아주 작은 모바일 */
+@media (max-width: 400px) {
+  .main-content {
+    padding: 8px;
+  }
+
+  .glass-card,
+  .calendar-container {
+    padding: 10px;
+  }
+
+  .app-header {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .current-page-title {
+    font-size: 0.95rem;
+  }
+
+  .page-title {
+    font-size: 1.15rem;
+  }
+
+  .kanban-column {
+    padding: 9px;
+  }
+
+  .task-card {
+    padding: 9px;
+  }
+
+  .task-title {
+    font-size: 0.82rem;
+  }
+}
+

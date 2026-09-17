@@ -452,15 +452,25 @@ export default function DiaryApp() {
       <div className="main-wrapper">
         <header className="app-header">
           <button
-            className="hamburger-btn"
+            type="button"
+            className={`hamburger-btn ${
+              isSidebarOpen ? "is-open" : ""
+            }`}
             onClick={() =>
               setIsSidebarOpen(
-                !isSidebarOpen
+                (prev) => !prev
               )
             }
-            aria-label="메뉴 열기"
+            aria-label={
+              isSidebarOpen
+                ? "메뉴 닫기"
+                : "메뉴 열기"
+            }
+            aria-expanded={isSidebarOpen}
           >
-            ☰
+            <span className="hamburger-line line-top" />
+            <span className="hamburger-line line-middle" />
+            <span className="hamburger-line line-bottom" />
           </button>
 
           <div className="current-page-title">
