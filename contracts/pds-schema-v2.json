@@ -1,0 +1,65 @@
+{
+  "version": "v2",
+  "timezone": "Asia/Seoul",
+  "tables": {
+    "plans": {
+      "id": "uuid",
+      "title": "text",
+      "period_start": "date",
+      "period_end": "date",
+      "priority": "low|medium|high",
+      "success_criteria": "text",
+      "estimated_time": "integer_minutes",
+      "created_at": "timestamptz",
+      "updated_at": "timestamptz"
+    },
+    "plan_histories": {
+      "id": "identity",
+      "plan_id": "uuid -> plans.id",
+      "version": "integer",
+      "title": "text",
+      "period_start": "date",
+      "period_end": "date",
+      "priority": "low|medium|high",
+      "success_criteria": "text",
+      "estimated_time": "integer_minutes",
+      "changed_at": "timestamptz"
+    },
+    "tasks": {
+      "id": "uuid",
+      "plan_id": "uuid -> plans.id",
+      "title": "text",
+      "description": "text",
+      "status": "todo|in_progress|done",
+      "start_date": "date",
+      "end_date": "date",
+      "due_date": "date",
+      "priority": "low|medium|high",
+      "tags": "jsonb string[]",
+      "estimated_time": "integer_minutes",
+      "subtasks": "jsonb",
+      "deleted_at": "timestamptz|null",
+      "created_at": "timestamptz",
+      "updated_at": "timestamptz"
+    },
+    "execution_logs": {
+      "id": "uuid",
+      "task_id": "uuid -> tasks.id",
+      "started_at": "timestamptz",
+      "ended_at": "timestamptz|null",
+      "actual_minutes": "integer_minutes",
+      "blocked_reason": "text|null",
+      "idempotency_key": "text unique",
+      "created_at": "timestamptz"
+    }
+  },
+  "rules": {
+    "delay": "status != done AND due_date < Asia/Seoul today",
+    "review_plan_count": "undeleted task count, matching T06-C28",
+    "review_done_count": "currently done task count",
+    "review_blocked_count": "tasks with at least one execution log whose blocked_reason has 1+ characters",
+    "time_difference": "sum(actual_minutes) - sum(estimated_time), missing values treated as 0",
+    "history": "before a plan update, the old values are inserted into plan_histories with an incrementing version",
+    "idempotency": "execution_logs.idempotency_key is unique and completion is performed by complete_task_idempotent"
+  }
+}
