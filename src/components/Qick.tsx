@@ -1,514 +1,150 @@
-"use client"
+"use client";
 
-import react, { useState } from "react";
-import { Task, TaskStatus, Subtask } from "../app/types/task";
+import React, { useEffect, useMemo, useState } from "react";
 import { getTodayString } from "../app/func/date";
-import { supabase } from "../app/lib/supabase";
-import React from "react";
-import {SubtaskInlineManager} from "./SupabaseClients"
+import { createTask, deleteTask as deleteTaskDB, getDeletedTasks, restoreTask, updateTask, updateTaskSubtasks } from "../app/func/task";
+import { getPlans } from "../app/func/plan";
+import { Task, TaskStatus, Subtask, Priority, Plan } from "../app/types/task";
+import { SubtaskInlineManager } from "./SupabaseClients";
+import { ExecutionLogPanel } from "./ExecutionLogPanel";
 
-// ============================================================================
-// 4. Table
-// ============================================================================
-export function TableView({
-  tasks,
-  setTasks,
-}: {
-  tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-}) {
+export function TableView({ tasks, setTasks }: { tasks: Task[]; setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newStatus, setNewStatus] = useState<TaskStatus>("todo");
   const [newStartDate, setNewStartDate] = useState(getTodayString());
   const [newEndDate, setNewEndDate] = useState(getTodayString());
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [newTags, setNewTags] = useState("");
+  const [newEstimated, setNewEstimated] = useState(0);
+  const [newPlanId, setNewPlanId] = useState<string>("");
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | Priority>("all");
+  const [tagFilter, setTagFilter] = useState("");
+  const [sortKey, setSortKey] = useState<"due" | "priority" | "created">("due");
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedTasks, setDeletedTasks] = useState<Task[]>([]);
 
-  const toggleExpand = (id: string) => {
-    setExpandedTaskId((prev) => (prev === id ? null : id));
-  };
+  useEffect(() => { getPlans().then(setPlans); }, []);
 
-  const deleteTask = async (id: string) => {
-    if (!confirm("정말 삭제하시겠습니까?")) return;
+  const priorityValue = (p?: Priority) => p === "high" ? 3 : p === "medium" ? 2 : 1;
 
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-    if (error) {
-      console.error("Task 삭제 실패:", error);
-      alert("삭제에 실패했습니다.");
-      return;
-    }
+  const visibleTasks = useMemo(() => {
+    const filtered = tasks.filter((t) => {
+      const q = search.trim().toLowerCase();
+      if (q && !t.title.toLowerCase().includes(q)) return false;
+      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (priorityFilter !== "all" && (t.priority || "medium") !== priorityFilter) return false;
+      if (tagFilter.trim() && !(t.tags || []).some((tag) => tag.toLowerCase().includes(tagFilter.trim().toLowerCase()))) return false;
+      return true;
+    });
+    return [...filtered].sort((a,b) => {
+      if (sortKey === "priority") return priorityValue(b.priority) - priorityValue(a.priority) || a.title.localeCompare(b.title);
+      if (sortKey === "created") return (b.createdAt || "").localeCompare(a.createdAt || "") || a.title.localeCompare(b.title);
+      return (a.dueDate || a.endDate).localeCompare(b.dueDate || b.endDate) || priorityValue(b.priority) - priorityValue(a.priority) || a.title.localeCompare(b.title);
+    });
+  }, [tasks, search, statusFilter, priorityFilter, tagFilter, sortKey]);
 
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-    if (expandedTaskId === id) setExpandedTaskId(null);
-  };
-
-  const updateTaskField = async <K extends keyof Task>(
-    id: string,
-    field: K,
-    value: Task[K]
-  ) => {
-    const currentTask = tasks.find((task) => task.id === id);
-    if (!currentTask) return;
-
-    const updatedTask: Task = { ...currentTask, [field]: value };
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        title: updatedTask.title,
-        description: updatedTask.description || "",
-        status: updatedTask.status,
-        start_date: updatedTask.startDate,
-        end_date: updatedTask.endDate,
-        subtasks: updatedTask.subtasks || [],
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Task 수정 실패:", error);
-      alert("수정에 실패했습니다.");
-      return;
-    }
-
-    setTasks((prev) => prev.map((task) => (task.id === id ? updatedTask : task)));
-  };
+  const loadDeleted = async () => setDeletedTasks(await getDeletedTasks());
 
   const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      title: newTitle.trim(),
-      description: "",
-      status: newStatus,
-      startDate: newStartDate,
-      endDate: newEndDate,
-      subtasks: [],
-    };
-
-    const { error } = await supabase.from("tasks").insert({
-      id: newTask.id,
-      title: newTask.title,
-      description: "",
-      status: newTask.status,
-      start_date: newTask.startDate,
-      end_date: newTask.endDate,
-      subtasks: [],
+    e.preventDefault(); if (!newTitle.trim()) return;
+    const newTask = await createTask({
+      title: newTitle.trim(), description: "", status: newStatus,
+      startDate: newStartDate, endDate: newEndDate, dueDate: newEndDate,
+      priority: newPriority, tags: newTags.split(",").map((v)=>v.trim()).filter(Boolean),
+      estimatedTime: newEstimated, planId: newPlanId || null, subtasks: [],
     });
-
-    if (error) {
-      console.error("Task 등록 실패:", error);
-      alert("작업 등록에 실패했습니다.");
-      return;
-    }
-
-    setTasks((prev) => [newTask, ...prev]);
-    setNewTitle("");
-    setExpandedTaskId(newTask.id);
+    if (!newTask) { alert("작업 등록에 실패했습니다."); return; }
+    setTasks((prev) => [newTask, ...prev]); setNewTitle(""); setNewTags(""); setNewEstimated(0); setExpandedTaskId(newTask.id);
   };
 
-  const addSubtask = async (taskId: string, title: string) => {
-    if (!title.trim()) return;
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const subtasks: Subtask[] = [
-      ...(task.subtasks || []),
-      { id: crypto.randomUUID(), title: title.trim(), isCompleted: false },
-    ];
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({ subtasks, updated_at: new Date().toISOString() })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error("하위 작업 추가 실패:", error);
-      alert("하위 작업 추가에 실패했습니다.");
-      return;
-    }
-
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, subtasks } : t)));
+  const saveTask = async (id: string, patch: Partial<Task>) => {
+    const current = tasks.find((t) => t.id === id); if (!current) return;
+    const updated = await updateTask(id, { ...current, ...patch });
+    if (!updated) { alert("수정에 실패했습니다."); return; }
+    setTasks((prev) => prev.map((t) => t.id === id ? updated : t));
   };
 
-  const toggleSubtask = async (taskId: string, subtaskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const subtasks = (task.subtasks || []).map((subtask) =>
-      subtask.id === subtaskId ? { ...subtask, isCompleted: !subtask.isCompleted } : subtask
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({ subtasks, updated_at: new Date().toISOString() })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error("체크리스트 변경 실패:", error);
-      return;
-    }
-
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, subtasks } : t)));
+  const remove = async (id: string) => {
+    if (!confirm("정말 삭제하시겠습니까? 삭제 후에도 복원할 수 있습니다.")) return;
+    if (!(await deleteTaskDB(id))) { alert("삭제에 실패했습니다."); return; }
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const deleteSubtask = async (taskId: string, subtaskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const subtasks = (task.subtasks || []).filter((subtask) => subtask.id !== subtaskId);
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({ subtasks, updated_at: new Date().toISOString() })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error("체크리스트 삭제 실패:", error);
-      return;
-    }
-
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, subtasks } : t)));
+  const restore = async (id: string) => {
+    const restored = await restoreTask(id); if (!restored) { alert("복원에 실패했습니다."); return; }
+    setTasks((prev) => [restored, ...prev]); setDeletedTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  return (
-    <div>
-      {/* CSS 미디어 쿼리 정의 (인라인 Style 태그로 분리) */}
-      <style>{`
-        /* 데스크톱 (1250px 초과): 테이블 표시, 카드는 숨김 */
-        .desktop-table-container { display: block; }
-        .mobile-card-container { display: none; }
+  const updateSubtasks = async (taskId: string, subtasks: Subtask[]) => {
+    if (!(await updateTaskSubtasks(taskId, subtasks))) { alert("체크리스트 변경에 실패했습니다."); return; }
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, subtasks } : t));
+  };
 
-        /* 1250px 이하: 테이블 숨김, 카드 리스트 표시 */
-        @media (max-width: 1250px) {
-          .desktop-table-container { display: none !important; }
-          .mobile-card-container { display: flex !important; flex-direction: column; gap: 12px; }
-        }
-      `}</style>
-
-      <div className="page-header">
-        <h1 className="page-title">테이블 상세 관리</h1>
-        <p className="page-subtitle">
-          테이블 및 카드 뷰를 통해 직관적으로 작업을 관리할 수 있으며, 클릭 시 하단에 세부사항과 체크리스트가 열립니다.
-        </p>
-      </div>
-
-      {/* 새 작업 빠른 등록 폼 */}
-      <div className="glass-card table-add-card">
-        <h2 className="table-add-title">➕ 새 작업 빠른 등록</h2>
-        <form onSubmit={handleAddTask} className="table-add-form">
-          <input
-            className="form-input table-add-input"
-            type="text"
-            placeholder="작업 제목 입력..."
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            required
-          />
-
-          <select
-            className="form-select table-add-select"
-            value={newStatus}
-            onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
-          >
-            <option value="todo">⏳ 진행해야 되는 일</option>
-            <option value="in_progress">🚀 진행 중인 일</option>
-            <option value="done">✅ 완료한 일</option>
-          </select>
-
-          <input
-            className="form-input table-add-date"
-            type="date"
-            value={newStartDate}
-            onChange={(e) => setNewStartDate(e.target.value)}
-          />
-
-          <input
-            className="form-input table-add-date"
-            type="date"
-            value={newEndDate}
-            onChange={(e) => setNewEndDate(e.target.value)}
-          />
-
-          <button type="submit" className="btn-primary table-add-btn">
-            등록
-          </button>
-        </form>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 💻 1. 데스크톱 뷰 (1250px 초과 시 표출) */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="glass-card table-card desktop-table-container" style={{ padding: "12px" }}>
-        <table className="custom-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr className="table-header-row" style={{ borderBottom: "2px solid #e2e8f0" }}>
-              <th style={{ width: "36px", textAlign: "center" }} />
-              <th style={{ minWidth: "200px", textAlign: "left", padding: "10px" }}>작업 제목</th>
-              <th style={{ width: "200px", textAlign: "left", padding: "10px" }}>상태</th>
-              <th style={{ width: "180px", textAlign: "left", padding: "10px" }}>기간 (시작 ~ 종료)</th>
-              <th style={{ width: "90px", textAlign: "center", padding: "10px" }}>하위 체크</th>
-              <th style={{ width: "60px", textAlign: "center", padding: "10px" }}>관리</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {tasks.map((task) => {
-              const isExpanded = expandedTaskId === task.id;
-              const completedSubtasks = task.subtasks?.filter((s) => s.isCompleted).length || 0;
-              const totalSubtasks = task.subtasks?.length || 0;
-
-              return (
-                <React.Fragment key={task.id}>
-                  <tr
-                    className={`table-body-row ${isExpanded ? "expanded" : ""}`}
-                    onClick={() => toggleExpand(task.id)}
-                    style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
-                  >
-                    <td style={{ textAlign: "center", color: "#64748b" }}>
-                      {isExpanded ? "▼" : "▶"}
-                    </td>
-
-                    <td style={{ padding: "8px", minWidth: "200px" }} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        className="form-input table-title-input"
-                        style={{ width: "100%" }}
-                        value={task.title}
-                        onChange={(e) => updateTaskField(task.id, "title", e.target.value)}
-                      />
-                    </td>
-
-                    <td style={{ padding: "8px", width: "200px" }} onClick={(e) => e.stopPropagation()}>
-                      <select
-                        className="form-select"
-                        style={{ width: "100%", padding: "6px 8px", fontSize: "0.85rem" }}
-                        value={task.status}
-                        onChange={(e) =>
-                          updateTaskField(task.id, "status", e.target.value as TaskStatus)
-                        }
-                      >
-                        <option value="todo">⏳ 진행해야 되는 일</option>
-                        <option value="in_progress">🚀 진행 중인 일</option>
-                        <option value="done">✅ 완료한 일</option>
-                      </select>
-                    </td>
-
-                    <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                          <span style={{ fontSize: "0.75rem", color: "#64748b", width: "24px" }}>시작</span>
-                          <input
-                            type="date"
-                            className="form-input"
-                            style={{ padding: "2px 4px", fontSize: "0.75rem", width: "100%" }}
-                            value={task.startDate}
-                            onChange={(e) => updateTaskField(task.id, "startDate", e.target.value)}
-                          />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                          <span style={{ fontSize: "0.75rem", color: "#64748b", width: "24px" }}>종료</span>
-                          <input
-                            type="date"
-                            className="form-input"
-                            style={{ padding: "2px 4px", fontSize: "0.75rem", width: "100%" }}
-                            value={task.endDate}
-                            onChange={(e) => updateTaskField(task.id, "endDate", e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td style={{ textAlign: "center" }}>
-                      <span
-                        style={{
-                          fontSize: "0.85rem",
-                          color: totalSubtasks > 0 ? "#2563eb" : "#94a3b8",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ☑️ {completedSubtasks}/{totalSubtasks}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="btn-mini"
-                        style={{ color: "#ef4444", fontSize: "1rem" }}
-                        onClick={() => deleteTask(task.id)}
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-
-                  {isExpanded && (
-                    <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                      <td colSpan={6} style={{ padding: "16px 20px" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-                          <div>
-                            <label className="form-label" style={{ fontWeight: 600, marginBottom: "6px", display: "block" }}>📝 세부 상세설명</label>
-                            <textarea
-                              className="form-input"
-                              rows={4}
-                              placeholder="상세 내용을 입력하세요..."
-                              value={task.description || ""}
-                              onChange={(e) =>
-                                updateTaskField(task.id, "description", e.target.value)
-                              }
-                              style={{ width: "100%", background: "#fff" }}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="form-label" style={{ fontWeight: 600, marginBottom: "6px", display: "block" }}>☑️ 하위 체크리스트 관리</label>
-                            <SubtaskInlineManager
-                              subtasks={task.subtasks || []}
-                              onAdd={(title) => addSubtask(task.id, title)}
-                              onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
-                              onDelete={(subtaskId) => deleteSubtask(task.id, subtaskId)}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 📱 2. 모바일/태블릿 카드 뷰 (1250px 이하 시 자동 전환) */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="mobile-card-container">
-        {tasks.map((task) => {
-          const isExpanded = expandedTaskId === task.id;
-          const completedSubtasks = task.subtasks?.filter((s) => s.isCompleted).length || 0;
-          const totalSubtasks = task.subtasks?.length || 0;
-
-          return (
-            <div
-              key={task.id}
-              className="glass-card"
-              style={{
-                padding: "16px",
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                background: "#ffffff",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-              }}
-            >
-              {/* 카드 상단: 제목 & 삭제 버튼 */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
-                <input
-                  className="form-input"
-                  style={{ flex: 1, fontWeight: 600, fontSize: "0.95rem" }}
-                  value={task.title}
-                  onChange={(e) => updateTaskField(task.id, "title", e.target.value)}
-                  placeholder="작업 제목"
-                />
-                <button
-                  className="btn-mini"
-                  style={{ color: "#ef4444", fontSize: "1.1rem", padding: "4px 8px" }}
-                  onClick={() => deleteTask(task.id)}
-                >
-                  🗑️
-                </button>
-              </div>
-
-              {/* 카드 중단: 상태 & 기간 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
-                <div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "4px" }}>상태</span>
-                  <select
-                    className="form-select"
-                    style={{ width: "100%", padding: "6px 8px", fontSize: "0.85rem" }}
-                    value={task.status}
-                    onChange={(e) => updateTaskField(task.id, "status", e.target.value as TaskStatus)}
-                  >
-                    <option value="todo">⏳ 진행해야 되는 일</option>
-                    <option value="in_progress">🚀 진행 중인 일</option>
-                    <option value="done">✅ 완료한 일</option>
-                  </select>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>기간</span>
-                  <input
-                    type="date"
-                    className="form-input"
-                    style={{ padding: "4px 6px", fontSize: "0.75rem" }}
-                    value={task.startDate}
-                    onChange={(e) => updateTaskField(task.id, "startDate", e.target.value)}
-                  />
-                  <input
-                    type="date"
-                    className="form-input"
-                    style={{ padding: "4px 6px", fontSize: "0.75rem" }}
-                    value={task.endDate}
-                    onChange={(e) => updateTaskField(task.id, "endDate", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* 카드 하단: 펼침 토글 버튼 */}
-              <button
-                onClick={() => toggleExpand(task.id)}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  fontSize: "0.85rem",
-                  color: "#3b82f6",
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                }}
-              >
-                <span>{isExpanded ? "▼ 상세내용 닫기" : "▶ 상세내용 & 체크리스트 열기"}</span>
-                <span style={{ fontSize: "0.8rem", color: "#2563eb" }}>
-                  (☑️ {completedSubtasks}/{totalSubtasks})
-                </span>
-              </button>
-
-              {/* 모바일 세부 상세 펼침 영역 */}
-              {isExpanded && (
-                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #e2e8f0" }}>
-                  <div style={{ marginBottom: "12px" }}>
-                    <label className="form-label" style={{ fontWeight: 600, marginBottom: "6px", display: "block" }}>📝 세부 상세설명</label>
-                    <textarea
-                      className="form-input"
-                      rows={3}
-                      placeholder="상세 내용을 입력하세요..."
-                      value={task.description || ""}
-                      onChange={(e) => updateTaskField(task.id, "description", e.target.value)}
-                      style={{ width: "100%", background: "#fff" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label" style={{ fontWeight: 600, marginBottom: "6px", display: "block" }}>☑️ 하위 체크리스트</label>
-                    <SubtaskInlineManager
-                      subtasks={task.subtasks || []}
-                      onAdd={(title) => addSubtask(task.id, title)}
-                      onToggle={(subtaskId) => toggleSubtask(task.id, subtaskId)}
-                      onDelete={(subtaskId) => deleteSubtask(task.id, subtaskId)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+  return <div>
+    <div className="page-header">
+      <h1 className="page-title">테이블 상세 관리</h1>
+      <p className="page-subtitle">검색·필터·정렬 기준을 화면에 명시하고, 작업을 생성·수정·완료·복원·삭제합니다.</p>
     </div>
-  );
+
+    <div className="glass-card task-control-card">
+      <div className="task-filter-row">
+        <input className="form-input" placeholder="제목 검색" value={search} onChange={(e)=>setSearch(e.target.value)} />
+        <select className="form-select" value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value as any)}><option value="all">상태 전체</option><option value="todo">진행해야 되는 일</option><option value="in_progress">진행 중인 일</option><option value="done">완료한 일</option></select>
+        <select className="form-select" value={priorityFilter} onChange={(e)=>setPriorityFilter(e.target.value as any)}><option value="all">우선순위 전체</option><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select>
+        <input className="form-input" placeholder="태그 필터" value={tagFilter} onChange={(e)=>setTagFilter(e.target.value)} />
+        <select className="form-select" value={sortKey} onChange={(e)=>setSortKey(e.target.value as any)}><option value="due">정렬: 마감일순</option><option value="priority">정렬: 우선순위순</option><option value="created">정렬: 생성일순</option></select>
+      </div>
+      <div className="active-sort-label">현재 정렬 기준: <strong>{sortKey === "due" ? "마감일순 → 우선순위 → 제목" : sortKey === "priority" ? "우선순위순 → 제목" : "생성일순 → 제목"}</strong></div>
+    </div>
+
+    <div className="glass-card table-add-card">
+      <h2 className="table-add-title">➕ 새 작업 빠른 등록</h2>
+      <form onSubmit={handleAddTask} className="table-add-form extended-task-form">
+        <input className="form-input" placeholder="작업 제목" value={newTitle} onChange={(e)=>setNewTitle(e.target.value)} required />
+        <select className="form-select" value={newStatus} onChange={(e)=>setNewStatus(e.target.value as TaskStatus)}><option value="todo">진행해야 되는 일</option><option value="in_progress">진행 중인 일</option><option value="done">완료한 일</option></select>
+        <input className="form-input" type="date" value={newStartDate} onChange={(e)=>setNewStartDate(e.target.value)} />
+        <input className="form-input" type="date" value={newEndDate} onChange={(e)=>setNewEndDate(e.target.value)} />
+        <select className="form-select" value={newPriority} onChange={(e)=>setNewPriority(e.target.value as Priority)}><option value="high">우선순위 높음</option><option value="medium">우선순위 보통</option><option value="low">우선순위 낮음</option></select>
+        <input className="form-input" type="number" min="0" placeholder="예상 분" value={newEstimated} onChange={(e)=>setNewEstimated(Number(e.target.value))} />
+        <input className="form-input" placeholder="태그: 공부,React" value={newTags} onChange={(e)=>setNewTags(e.target.value)} />
+        <select className="form-select" value={newPlanId} onChange={(e)=>setNewPlanId(e.target.value)}><option value="">계획 연결 안 함</option>{plans.map((p)=><option key={p.id} value={p.id}>{p.title}</option>)}</select>
+        <button type="submit" className="btn-primary">등록</button>
+      </form>
+    </div>
+
+    <div className="glass-card table-card">
+      {visibleTasks.length === 0 ? <p>조건에 맞는 작업이 없습니다.</p> : visibleTasks.map((task) => {
+        const expanded = expandedTaskId === task.id;
+        const priority = task.priority || "medium";
+        return <div className={`task-manager-row ${expanded ? "expanded" : ""}`} key={task.id}>
+          <div className="task-manager-main" onClick={()=>setExpandedTaskId(expanded ? null : task.id)}>
+            <span>{expanded ? "▼" : "▶"}</span><strong>{task.title}</strong><span className={`priority-badge priority-${priority}`}>{priority}</span><span>{task.status}</span><span>마감 {task.dueDate || task.endDate}</span><button className="btn-mini" onClick={(e)=>{e.stopPropagation(); remove(task.id)}}>삭제</button>
+          </div>
+          {expanded && <div className="task-manager-detail">
+            <div className="task-edit-grid">
+              <label>제목<input className="form-input" value={task.title} onChange={(e)=>saveTask(task.id,{title:e.target.value})}/></label>
+              <label>상태<select className="form-select" value={task.status} onChange={(e)=>saveTask(task.id,{status:e.target.value as TaskStatus})}><option value="todo">진행해야 되는 일</option><option value="in_progress">진행 중인 일</option><option value="done">완료한 일</option></select></label>
+              <label>마감일<input className="form-input" type="date" value={task.dueDate || task.endDate} onChange={(e)=>saveTask(task.id,{dueDate:e.target.value,endDate:e.target.value})}/></label>
+              <label>우선순위<select className="form-select" value={priority} onChange={(e)=>saveTask(task.id,{priority:e.target.value as Priority})}><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select></label>
+              <label>예상 시간(분)<input className="form-input" type="number" min="0" value={task.estimatedTime || 0} onChange={(e)=>saveTask(task.id,{estimatedTime:Number(e.target.value)})}/></label>
+              <label>태그<input className="form-input" value={(task.tags || []).join(", ")} onChange={(e)=>saveTask(task.id,{tags:e.target.value.split(",").map((v)=>v.trim()).filter(Boolean)})}/></label>
+            </div>
+            <label className="task-description-label">상세 설명<textarea className="form-input" value={task.description || ""} onChange={(e)=>saveTask(task.id,{description:e.target.value})}/></label>
+            <div><label className="form-label">☑️ 하위 체크리스트</label><SubtaskInlineManager subtasks={task.subtasks || []} onAdd={(title)=>updateSubtasks(task.id,[...(task.subtasks || []),{id:crypto.randomUUID(),title,isCompleted:false}])} onToggle={(id)=>updateSubtasks(task.id,(task.subtasks || []).map((s)=>s.id===id?{...s,isCompleted:!s.isCompleted}:s))} onDelete={(id)=>updateSubtasks(task.id,(task.subtasks || []).filter((s)=>s.id!==id))}/></div>
+            <ExecutionLogPanel taskId={task.id} onCompleted={()=>setTasks((prev)=>prev.map((t)=>t.id===task.id?{...t,status:"done"}:t))}/>
+          </div>}
+        </div>;
+      })}
+    </div>
+
+    <div className="glass-card restore-card">
+      <div><h2 className="section-title">삭제된 작업 복원</h2><p>삭제는 DB에서 즉시 지우지 않고 deleted_at을 남겨 복원할 수 있습니다.</p></div>
+      <button className="btn-primary" onClick={async()=>{await loadDeleted();setShowDeleted(true)}}>삭제 목록 불러오기</button>
+      {showDeleted && <div className="deleted-task-list">{deletedTasks.length===0?<p>삭제된 작업이 없습니다.</p>:deletedTasks.map((t)=><div className="deleted-task-row" key={t.id}><span>{t.title}</span><span>{t.deletedAt ? new Date(t.deletedAt).toLocaleString("ko-KR") : ""}</span><button className="btn-mini" onClick={()=>restore(t.id)}>복원</button></div>)}</div>}
+    </div>
+  </div>;
 }
