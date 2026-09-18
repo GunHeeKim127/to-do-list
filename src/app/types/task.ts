@@ -15,3 +15,21 @@ export interface Task {
   endDate: string;
   subtasks?: Subtask[];
 }
+
+export type ActiveTab =
+  | "dashboard"
+  | "kanban"
+  | "calendar"
+  | "table";
+
+export type SupabaseTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  start_date: string;
+  end_date: string;
+  subtasks: Subtask[];
+  created_at: string;
+  updated_at: string;
+};
