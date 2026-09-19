@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createPlan, getPlanHistories, getPlans, updatePlan } from "../app/func/plan";
-import { Plan, PlanHistory, Priority } from "../app/types/task";
+import { Plan, PlanHistory, Priority, Task } from "../app/types/task";
 import { getTodayString } from "../app/func/date";
 
 const emptyPlan = (): Omit<Plan, "id"> => ({
@@ -14,7 +14,7 @@ const emptyPlan = (): Omit<Plan, "id"> => ({
   estimatedTime: 0,
 });
 
-export function PlanView() {
+export function PlanView({ tasks }: { tasks: Task[] }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [form, setForm] = useState(emptyPlan());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,6 +96,27 @@ export function PlanView() {
             </div>
             <div className="plan-meta"><span>📅 {plan.periodStart} ~ {plan.periodEnd}</span><span>⏱ {plan.estimatedTime}분</span></div>
             <p><strong>성공 기준:</strong> {plan.successCriteria}</p>
+            {(() => {
+              const linkedTasks = tasks.filter((task) => task.planId === plan.id);
+              return (
+                <div className="plan-linked-tasks">
+                  <strong>연결된 작업 {linkedTasks.length}개</strong>
+                  {linkedTasks.length === 0 ? (
+                    <p className="plan-linked-empty">아직 연결된 작업이 없습니다. 할 일 추가/수정에서 이 계획을 선택하세요.</p>
+                  ) : (
+                    <div className="plan-linked-task-list">
+                      {linkedTasks.map((task) => (
+                        <div className="plan-linked-task" key={task.id}>
+                          <span className={`status-dot ${task.status}`} />
+                          <span>{task.title}</span>
+                          <small>{task.dueDate || task.endDate}</small>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {histories[plan.id] && (
               <div className="history-list">
                 <strong>수정 전 계획 History</strong>

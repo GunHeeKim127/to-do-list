@@ -349,7 +349,7 @@ export default function DiaryApp() {
             />
           )}
 
-          {activeTab === "plans" && <PlanView />}
+          {activeTab === "plans" && <PlanView tasks={tasks} />}
 
           {activeTab === "review" && (
             <ReviewView
@@ -441,9 +441,8 @@ function TaskModal({
       ? task.estimatedTime
       : DUMMY_ESTIMATED_TIME[initialPriority]
   );
-  const [tags, setTags] = useState(
-    (task?.tags || []).join(", ")
-  );
+  const [tags, setTags] = useState<string[]>(task?.tags || []);
+  const [tagInput, setTagInput] = useState("");
   const [planId, setPlanId] = useState(
     task?.planId || ""
   );
@@ -457,6 +456,29 @@ function TaskModal({
   useEffect(() => {
     getPlans().then(setPlans);
   }, []);
+
+  const addTag = (value: string) => {
+    const normalized = value.trim().replace(/^#/, "");
+    if (!normalized) return;
+
+    setTags((prev) =>
+      prev.some((tag) => tag.toLowerCase() === normalized.toLowerCase())
+        ? prev
+        : [...prev, normalized]
+    );
+    setTagInput("");
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagInput);
+    }
+  };
 
   const handlePriorityChange = (
     nextPriority: Priority
@@ -503,10 +525,7 @@ function TaskModal({
       dueDate: endDate,
       priority,
       estimatedTime,
-      tags: tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
+      tags,
       planId: planId || null,
       subtasks,
       deletedAt: task?.deletedAt || null,
@@ -708,18 +727,40 @@ function TaskModal({
             </div>
 
             <div className="form-group">
-              <label className="form-label">
-                태그
-              </label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="공부, React, 운동"
-                value={tags}
-                onChange={(e) =>
-                  setTags(e.target.value)
-                }
-              />
+              <label className="form-label">태그</label>
+              <div className="tag-editor">
+                <div className="tag-list">
+                  {tags.map((tag) => (
+                    <span className="task-tag" key={tag}>
+                      #{tag}
+                      <button
+                        type="button"
+                        aria-label={`${tag} 태그 삭제`}
+                        onClick={() => removeTag(tag)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="tag-input-row">
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="태그 입력 후 Enter"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                  />
+                  <button
+                    type="button"
+                    className="btn-mini"
+                    onClick={() => addTag(tagInput)}
+                  >
+                    + 추가
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
