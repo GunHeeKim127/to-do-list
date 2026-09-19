@@ -9,10 +9,12 @@ interface HeaderProps {
 }
 
 const tabNames: Record<ActiveTab, string> = {
-  dashboard: "📊 전체 대시보드",
-  kanban: "📋 투두 칸반 보드",
-  calendar: "📅 캘린더 및 타임라인",
-  table: "📑 테이블 상세 관리",
+    dashboard: "📊 전체 대시보드",
+    kanban: "📋 투두 칸반 보드",
+    calendar: "📅 캘린더 및 타임라인",
+    table: "📑 테이블 상세 관리",
+    plans: "",
+    review: ""
 };
 
 export function Header({

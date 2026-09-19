@@ -52,12 +52,16 @@ export function ReviewView({ tasks, onGoToPlans }: { tasks: Task[]; onGoToPlans:
     });
   };
 
-  const cards = [
-    ["계획 수", tasks.length, "all" as const],
-    ["완료 수", done.length, "done" as const],
-    ["지연 수", delayed.length, "delayed" as const],
-    ["막힘 수", blocked.length, "blocked" as const],
-  ];
+  const cards: [
+    string,
+    number,
+    "all" | "done" | "delayed" | "blocked"
+  ][] = [
+      ["계획 수", tasks.length, "all"],
+      ["완료 수", done.length, "done"],
+      ["지연 수", delayed.length, "delayed"],
+      ["막힘 수", blocked.length, "blocked"],
+    ];
 
   return <div>
     <div className="page-header">
@@ -88,7 +92,7 @@ export function ReviewView({ tasks, onGoToPlans }: { tasks: Task[]; onGoToPlans:
     <div className="glass-card improvement-card">
       <h2 className="section-title">다음 계획으로 넘길 개선점</h2>
       <p>예상 시간과 실제 시간의 차이를 확인한 뒤 개선점을 다음 계획의 성공 기준 기본값으로 넘길 수 있습니다.</p>
-      <button className="btn-primary" onClick={() => { localStorage.setItem("taskdiary-improvement", `실제 ${actual}분 - 예상 ${estimated}분 = ${actual-estimated}분. 다음 계획에서 예상 시간을 보정합니다.`); alert("개선점을 저장했습니다. 새 계획 작성 화면으로 이동합니다."); onGoToPlans(); }}>개선점을 새 계획으로 이관</button>
+      <button className="btn-primary" onClick={() => { localStorage.setItem("taskdiary-improvement", `실제 ${actual}분 - 예상 ${estimated}분 = ${actual - estimated}분. 다음 계획에서 예상 시간을 보정합니다.`); alert("개선점을 저장했습니다. 새 계획 작성 화면으로 이동합니다."); onGoToPlans(); }}>개선점을 새 계획으로 이관</button>
       <span className="improvement-hint">저장 후 「계획 세우기」에서 새 계획을 작성할 때 참고할 수 있습니다.</span>
     </div>
 

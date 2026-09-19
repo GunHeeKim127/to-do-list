@@ -1,0 +1,1 @@
+    const groqModelName = process.env.GROQ_MODEL_NAME || "openai/gpt-oss-120b";
