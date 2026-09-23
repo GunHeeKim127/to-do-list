@@ -255,6 +255,7 @@ export function KanbanView({
 
                   {task.description && (
                     <p
+                      className="task-card-description"
                       style={{
                         fontSize:
                           "0.75rem",
@@ -262,12 +263,6 @@ export function KanbanView({
                           "#64748b",
                         margin:
                           "4px 0 8px 0",
-                        overflow:
-                          "hidden",
-                        textOverflow:
-                          "ellipsis",
-                        whiteSpace:
-                          "nowrap",
                       }}
                     >
                       📝{" "}

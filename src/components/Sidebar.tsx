@@ -15,6 +15,7 @@ export function Sidebar({
   onClose,
   onTabChange,
 }: SidebarProps) {
+  const taskWorkspaceActive = activeTab === "kanban" || activeTab === "calendar" || activeTab === "table";
   const handleTabClick = (tab: ActiveTab) => {
     onTabChange(tab);
     onClose();
@@ -52,31 +53,40 @@ export function Sidebar({
 
             <li
               className={`nav-item ${
-                activeTab === "kanban" ? "active" : ""
+                activeTab === "today" ? "active" : ""
               }`}
+              onClick={() => handleTabClick("today")}
+            >
+              ☀️ 오늘 할 일
+            </li>
+
+            <li
+              className={`nav-item ${taskWorkspaceActive ? "active" : ""}`}
               onClick={() => handleTabClick("kanban")}
             >
-              📋 칸반 보드
+              📋 할 일 관리
             </li>
 
             <li
               className={`nav-item ${
-                activeTab === "calendar" ? "active" : ""
+                activeTab === "plans" ? "active" : ""
               }`}
-              onClick={() => handleTabClick("calendar")}
+              onClick={() => handleTabClick("plans")}
             >
-              📅 캘린더
+              🎯 계획 관리
             </li>
 
-            <li
-              className={`nav-item ${
-                activeTab === "table" ? "active" : ""
-              }`}
-              onClick={() => handleTabClick("table")}
-            >
-              📑 테이블 목록 관리
-            </li>
           </ul>
+          <details className="sidebar-more" open={activeTab === "trash"}>
+            <summary>••• 더보기</summary>
+            <button
+              type="button"
+              className={`nav-item ${activeTab === "trash" ? "active" : ""}`}
+              onClick={() => handleTabClick("trash")}
+            >
+              🗑️ 삭제된 작업
+            </button>
+          </details>
         </div>
       </aside>
     </>

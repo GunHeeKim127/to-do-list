@@ -10,11 +10,12 @@ interface HeaderProps {
 
 const tabNames: Record<ActiveTab, string> = {
     dashboard: "📊 전체 대시보드",
-    kanban: "📋 투두 칸반 보드",
-    calendar: "📅 캘린더 및 타임라인",
-    table: "📑 테이블 상세 관리",
-    plans: "",
-    review: ""
+    today: "☀️ 오늘 할 일",
+    kanban: "📋 할 일 관리 · 칸반",
+    calendar: "📋 할 일 관리 · 캘린더",
+    table: "📋 할 일 관리 · 목록",
+    plans: "🎯 메인 계획과 할 일 관리",
+    trash: "🗑️ 삭제된 작업"
 };
 
 export function Header({
@@ -41,6 +42,9 @@ export function Header({
 
       <div className="current-page-title">
         {tabNames[activeTab]}
+      </div>
+      <div className="header-context-slot" aria-label="현재 작업공간">
+        <span className="workspace-chip">개인 작업공간</span>
       </div>
     </header>
   );

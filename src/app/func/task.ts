@@ -69,10 +69,14 @@ export const restoreTask = async (taskId: string): Promise<Task | null> => {
   return convertSupabaseTask(data as SupabaseTask);
 };
 
-export const updateTaskStatus = async (taskId: string, status: TaskStatus): Promise<boolean> => {
-  const { error } = await supabase.from("tasks").update({ status, updated_at: new Date().toISOString() }).eq("id", taskId);
-  if (error) { console.error("Task 상태 변경 실패:", error); return false; }
-  return true;
+export const updateTaskStatus = async (taskId: string, status: TaskStatus): Promise<Task | null> => {
+  const { data, error } = await supabase.from("tasks")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", taskId)
+    .select()
+    .single();
+  if (error) { console.error("Task 상태 변경 실패:", error); return null; }
+  return convertSupabaseTask(data as SupabaseTask);
 };
 
 export const updateTaskSubtasks = async (taskId: string, subtasks: Task["subtasks"]): Promise<boolean> => {

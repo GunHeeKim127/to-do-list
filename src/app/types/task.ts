@@ -56,11 +56,12 @@ export interface ExecutionLog {
 
 export type ActiveTab =
   | "dashboard"
+  | "today"
   | "kanban"
   | "calendar"
   | "table"
   | "plans"
-  | "review";
+  | "trash";
 
 export type SupabaseTask = {
   id: string;

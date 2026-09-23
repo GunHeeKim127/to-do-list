@@ -7,12 +7,17 @@ const toLog = (l: any): ExecutionLog => ({
   idempotencyKey: l.idempotency_key, createdAt: l.created_at,
 });
 
-export async function getExecutionLogs(taskId?: string): Promise<ExecutionLog[]> {
-  let q = supabase.from("execution_logs").select("*").order("started_at", { ascending: false });
-  if (taskId) q = q.eq("task_id", taskId);
-  const { data, error } = await q;
-  if (error) { console.error("실행 기록 조회 실패:", error); return []; }
-  return (data || []).map(toLog);
+export async function getExecutionLogs(taskId?: string, throwOnError = false): Promise<ExecutionLog[]> {
+  const logs: ExecutionLog[] = [];
+  for (let offset = 0; ; offset += 500) {
+    let q = supabase.from("execution_logs").select("*")
+      .order("started_at", { ascending: false }).order("id").range(offset, offset + 499);
+    if (taskId) q = q.eq("task_id", taskId);
+    const { data, error } = await q;
+    if (error) { console.error("실행 기록 조회 실패:", error); if (throwOnError) throw error; return []; }
+    logs.push(...(data || []).map(toLog));
+    if (!data || data.length < 500) return logs;
+  }
 }
 
 export async function createExecutionLog(input: Omit<ExecutionLog, "id" | "createdAt">): Promise<ExecutionLog | null> {
