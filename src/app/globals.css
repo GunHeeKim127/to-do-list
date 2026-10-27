@@ -29,6 +29,18 @@
   --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: linear-gradient(135deg, #eef2ff, #f8fafc); }
+.auth-card { width: min(100%, 430px); padding: 32px; }
+.auth-brand { color: var(--primary-color, #6366f1); font-weight: 900; letter-spacing: .04em; }
+.auth-card h1 { margin: 10px 0 8px; }
+.auth-card > p { color: #64748b; line-height: 1.6; margin-bottom: 22px; }
+.auth-card form { display: grid; gap: 15px; }
+.auth-card label { display: grid; gap: 7px; font-weight: 700; font-size: .88rem; }
+.auth-message { color: #b45309; background: #fffbeb; border-radius: 8px; padding: 10px; font-size: .85rem; }
+.auth-mode-button { width: 100%; margin-top: 14px; border: 0; background: transparent; color: #4f46e5; cursor: pointer; }
+.header-user-email { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; color: #64748b; }
+.super-admin-badge { padding: 5px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: .72rem; font-weight: 800; }
+
 /* 메인 계획 → 기존 subtasks 관리 */
 .manager-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .manager-heading .btn-primary, .manager-empty .btn-primary { width: auto; flex-shrink: 0; }
@@ -1556,9 +1568,19 @@ body {
 .plan-linked-tasks { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color); }
 .plan-linked-empty { margin-top: 10px; color: var(--text-muted); }
 .plan-linked-task-list { display: grid; gap: 8px; margin-top: 12px; }
-.plan-linked-task { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; font-size: .82rem; }
+.plan-link-existing { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 12px 0; padding: 12px; border-radius: 10px; background: #f8fafc; }
+.plan-link-existing .btn-mini { padding: 8px 12px; border: 1px solid #cbd5e1; white-space: nowrap; }
+.plan-link-existing .btn-mini:disabled { opacity: .5; cursor: not-allowed; }
+.plan-linked-task { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; font-size: .82rem; }
 .plan-linked-task > span:nth-child(2) { overflow-wrap: anywhere; }
 .plan-linked-task small { color: var(--text-muted); }
+.completed-task-disclosure { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+.completed-task-disclosure summary { display: flex; justify-content: space-between; gap: 12px; padding: 9px 4px; color: #475569; cursor: pointer; list-style: none; }
+.completed-task-disclosure summary::-webkit-details-marker { display: none; }
+.completed-task-disclosure summary small { color: #64748b; }
+.completed-task-disclosure[open] summary small { font-size: 0; }
+.completed-task-disclosure[open] summary small::after { content: "접기"; font-size: .8rem; }
+.completed-task-disclosure .plan-linked-task { opacity: .78; }
 .plan-card p { line-height: 1.55; overflow-wrap: anywhere; }
 .priority-badge { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 999px; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
 .priority-high { background: #fee2e2; color: #b91c1c; }
@@ -1647,8 +1669,9 @@ body {
   .execution-row, .review-task-row { grid-template-columns: 1fr; }
   .restore-card, .export-card { display: grid; grid-template-columns: 1fr; }
   .plan-card-header { flex-direction: column; }
-  .plan-linked-task { grid-template-columns: 12px minmax(0, 1fr) auto auto; }
-  .plan-linked-task small { grid-column: 2 / -1; }
+  .plan-link-existing { grid-template-columns: 1fr; }
+  .plan-linked-task { grid-template-columns: 12px minmax(0, 1fr); }
+  .plan-linked-task small, .plan-linked-task button { grid-column: 2; }
   .calendar-grid { min-width: 700px; }
 }
 
@@ -1667,6 +1690,24 @@ body {
 .workspace-disclosure[open] > summary::after { content: "접기"; }
 .workspace-disclosure-body { padding: 0 20px 20px; border-top: 1px solid #eef2f7; }
 .workspace-disclosure-body > div { padding-top: 20px; }
+.plan-history-launcher { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(255,255,255,.84); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.plan-history-launcher div { display: grid; gap: 4px; }
+.plan-history-launcher small { color: #64748b; }
+.plan-history-launcher .btn-primary { width: auto; white-space: nowrap; }
+.history-drawer-overlay { position: fixed; inset: 0; z-index: 1300; background: rgba(15,23,42,.42); backdrop-filter: blur(3px); display: flex; align-items: flex-end; }
+.history-drawer { width: 100%; max-height: 82vh; background: #f8fafc; border-radius: 22px 22px 0 0; box-shadow: 0 -24px 70px rgba(15,23,42,.24); display: flex; flex-direction: column; animation: historyDrawerUp .24s ease-out; }
+.history-drawer-header { padding: 18px 24px; border-bottom: 1px solid #e2e8f0; background: #fff; border-radius: 22px 22px 0 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.history-drawer-header h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.history-drawer-header p { margin: 0; color: #64748b; font-size: .8rem; }
+.history-drawer-body { padding: 20px 24px 28px; overflow-y: auto; }
+@keyframes historyDrawerUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+@media (max-width: 640px) {
+  .plan-history-launcher { align-items: stretch; flex-direction: column; }
+  .plan-history-launcher .btn-primary { width: 100%; }
+  .history-drawer { max-height: 90vh; }
+  .history-drawer-header, .history-drawer-body { padding-left: 16px; padding-right: 16px; }
+}
 
 @media (max-width: 420px) {
   .execution-form-actions { flex-direction: column; }

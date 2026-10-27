@@ -4,6 +4,7 @@ import { Plan, PlanHistory } from "../types/task";
 const toPlan = (p: any): Plan => ({
   id: p.id, title: p.title, periodStart: p.period_start, periodEnd: p.period_end,
   priority: p.priority, successCriteria: p.success_criteria, estimatedTime: Number(p.estimated_time || 0),
+  status: p.status || "in_progress",
   createdAt: p.created_at, updatedAt: p.updated_at,
 });
 
@@ -25,6 +26,7 @@ export async function createPlan(plan: Omit<Plan, "id">): Promise<Plan | null> {
   const { data, error } = await supabase.from("plans").insert({
     title: plan.title, period_start: plan.periodStart, period_end: plan.periodEnd, priority: plan.priority,
     success_criteria: plan.successCriteria, estimated_time: plan.estimatedTime || 0,
+    status: plan.status,
   }).select().single();
   if (error) { console.error("계획 생성 실패:", error); return null; }
   return toPlan(data);
@@ -40,6 +42,7 @@ export async function updatePlan(planId: string, plan: Omit<Plan, "id">): Promis
     p_priority: plan.priority,
     p_success_criteria: plan.successCriteria,
     p_estimated_time: plan.estimatedTime || 0,
+    p_status: plan.status,
   });
   if (error) { console.error("계획 수정 실패:", error); return null; }
   return toPlan(data);

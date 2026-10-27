@@ -5,7 +5,7 @@ import {
   createPlan,
   updatePlan,
 } from "../app/func/plan";
-import { Plan, Priority, Task } from "../app/types/task";
+import { Plan, Priority, Task, TaskStatus } from "../app/types/task";
 import { getTodayString } from "../app/func/date";
 
 const emptyPlan = (): Omit<Plan, "id"> => ({
@@ -15,19 +15,22 @@ const emptyPlan = (): Omit<Plan, "id"> => ({
   priority: "medium",
   successCriteria: "",
   estimatedTime: 0,
+  status: "in_progress",
 });
 
-export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, onDeleteTask }: {
+export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, onDeleteTask, onAssignTask }: {
   plans: Plan[];
   tasks: Task[];
   onPlansChanged: (plans: Plan[]) => void;
   onAddTask: (planId: string) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
+  onAssignTask: (task: Task, planId: string | null) => Promise<void>;
 }) {
   const [form, setForm] = useState<Omit<Plan, "id">>(emptyPlan());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [linkSelections, setLinkSelections] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // 돌아보기에서 전달한 개선점을 다음 계획의 성공 기준으로 사용
@@ -102,6 +105,7 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
       priority: plan.priority,
       successCriteria: plan.successCriteria,
       estimatedTime: plan.estimatedTime,
+      status: plan.status,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -122,7 +126,7 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
             {editingId ? "✏️ 계획 수정" : "✨ 새 계획 만들기"}
           </h2>
           <p style={{ margin: 0, color: "#64748b", fontSize: "0.85rem" }}>
-            메인 계획을 저장한 뒤 그 카드에서 할 일을 추가하면 소속 계획이 자동으로 연결됩니다.
+            제목·기간·우선순위·성공 기준·예상 시간을 모두 저장하고 나중에 다시 수정할 수 있습니다.
           </p>
         </div>
 
@@ -162,6 +166,12 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
             <option value="high">높음</option>
             <option value="medium">보통</option>
             <option value="low">낮음</option>
+          </select>
+
+          <select className="form-select" aria-label="메인 계획 진행 상태" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}>
+            <option value="todo">진행 예정</option>
+            <option value="in_progress">진행 중</option>
+            <option value="done">완료</option>
           </select>
 
           <input
@@ -204,6 +214,16 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
         ) : (
           plans.map((plan) => {
             const linkedTasks = tasks.filter((task) => task.planId === plan.id);
+            const activeTasks = linkedTasks.filter((task) => task.status !== "done");
+            const completedTasks = linkedTasks.filter((task) => task.status === "done");
+            const renderTaskRow = (task: Task) => <div className="plan-linked-task" key={task.id}>
+              <span className={`status-dot ${task.status}`} />
+              <span>{task.title}</span>
+              <small>{task.dueDate || task.endDate}</small>
+              <button className="btn-mini" onClick={() => onEditTask(task)}>전체 수정</button>
+              <button className="btn-mini" onClick={() => void onAssignTask(task, null)}>연결 해제</button>
+              <button className="btn-mini danger-text" onClick={() => onDeleteTask(task.id)}>삭제</button>
+            </div>;
 
             return (
               <div className="glass-card plan-card" key={plan.id}>
@@ -215,7 +235,7 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
                     </span>
                   </div>
                   <div className="plan-card-actions">
-                    <button className="btn-mini" onClick={() => edit(plan)}>수정</button>
+                    <button className="btn-mini" onClick={() => edit(plan)}>메인 계획 전체 수정</button>
                   </div>
                 </div>
 
@@ -230,26 +250,29 @@ export function PlanView({ plans, tasks, onPlansChanged, onAddTask, onEditTask, 
 
                 <div className="plan-linked-tasks">
                   <div className="plan-card-header">
-                    <strong>연결된 할 일 {linkedTasks.length}개</strong>
-                    <button className="btn-primary" style={{ width: "auto" }} onClick={() => onAddTask(plan.id)}>+ 할 일 추가</button>
+                    <div><strong>진행할 하위 할 일 · {activeTasks.length}개</strong><p className="manager-hint">예정·진행 중인 항목을 먼저 보여줍니다. 완료된 항목은 아래에서 펼쳐볼 수 있습니다.</p></div>
+                    <button className="btn-primary" style={{ width: "auto" }} onClick={() => onAddTask(plan.id)}>+ 새 하위 할 일</button>
                   </div>
-                  {linkedTasks.length === 0 ? (
+                  <div className="plan-link-existing">
+                    <select className="form-select" aria-label={`${plan.title}에 기존 할 일 연결`} value={linkSelections[plan.id] || ""} onChange={(event) => setLinkSelections((prev) => ({ ...prev, [plan.id]: event.target.value }))}>
+                      <option value="">연결되지 않은 기존 할 일 선택</option>
+                      {tasks.filter((task) => !task.planId).map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+                    </select>
+                    <button type="button" className="btn-mini" disabled={!linkSelections[plan.id]} onClick={async () => { const task = tasks.find((item) => item.id === linkSelections[plan.id]); if (!task) return; await onAssignTask(task, plan.id); setLinkSelections((prev) => ({ ...prev, [plan.id]: "" })); }}>기존 할 일 연결</button>
+                  </div>
+                  {activeTasks.length === 0 ? (
                     <p className="plan-linked-empty">
-                      아직 연결된 할 일이 없습니다. 위 버튼으로 첫 할 일을 추가하세요.
+                      진행할 하위 할 일이 없습니다. 새 할 일을 추가하거나 완료 목록을 확인하세요.
                     </p>
                   ) : (
                     <div className="plan-linked-task-list">
-                      {linkedTasks.map((task) => (
-                        <div className="plan-linked-task" key={task.id}>
-                          <span className={`status-dot ${task.status}`} />
-                          <span>{task.title}</span>
-                          <small>{task.dueDate || task.endDate}</small>
-                          <button className="btn-mini" onClick={() => onEditTask(task)}>수정</button>
-                          <button className="btn-mini danger-text" onClick={() => onDeleteTask(task.id)}>삭제</button>
-                        </div>
-                      ))}
+                      {activeTasks.map(renderTaskRow)}
                     </div>
                   )}
+                  {completedTasks.length > 0 && <details className="completed-task-disclosure">
+                    <summary><span>✅ 완료된 할 일 {completedTasks.length}개</span><small>눌러서 보기</small></summary>
+                    <div className="plan-linked-task-list">{completedTasks.map(renderTaskRow)}</div>
+                  </details>}
                 </div>
 
               </div>

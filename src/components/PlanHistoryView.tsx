@@ -19,8 +19,11 @@ function getChanges(before: PlanHistory, after?: Plan): ChangeItem[] {
   if (before.priority !== after.priority) changes.push({ label: "우선순위", before: priorityLabel(before.priority), after: priorityLabel(after.priority) });
   if (before.successCriteria !== after.successCriteria) changes.push({ label: "성공 기준", before: before.successCriteria, after: after.successCriteria });
   if (before.estimatedTime !== after.estimatedTime) changes.push({ label: "예상 시간", before: `${before.estimatedTime}분`, after: `${after.estimatedTime}분` });
+  if (before.status !== after.status) changes.push({ label: "진행 상태", before: statusLabels[before.status], after: statusLabels[after.status] });
   return changes;
 }
+
+const statusLabels = { todo: "진행 예정", in_progress: "진행 중", done: "완료" };
 
 export function PlanHistoryView({ plans, embedded = false }: { plans: Plan[]; embedded?: boolean }) {
   const [histories, setHistories] = useState<PlanHistory[]>([]);

@@ -33,6 +33,7 @@ export interface Plan {
   priority: Priority;
   successCriteria: string;
   estimatedTime: number;
+  status: TaskStatus;
   createdAt?: string;
   updatedAt?: string;
 }

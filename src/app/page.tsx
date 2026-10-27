@@ -30,12 +30,18 @@ import { PlanHistoryView } from "../components/PlanHistoryView";
 import { DailyCheckView } from "../components/DailyCheckView";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
+import { AuthView } from "../components/AuthView";
+import { supabase } from "./lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 // ============================================================================
 // Supabase → Task 변환
 // ============================================================================
 
 export default function DiaryApp() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [activeTab, setActiveTab] =
     useState<ActiveTab>("dashboard");
 
@@ -43,6 +49,7 @@ export default function DiaryApp() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPlanHistoryOpen, setIsPlanHistoryOpen] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [defaultPlanId, setDefaultPlanId] = useState<string>("");
@@ -60,6 +67,8 @@ export default function DiaryApp() {
   // ==========================================================================
 
   const loadData = async () => {
+    const { data: profile } = await supabase.from("profiles").select("site_role").single();
+    setIsSuperAdmin(profile?.site_role === "super_admin");
     const [taskData, planData] = await Promise.all([getTasks(), getPlans()]);
     setTasks(taskData);
     setPlans(planData);
@@ -67,8 +76,26 @@ export default function DiaryApp() {
   };
 
   useEffect(() => {
-    void loadData();
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session); setAuthChecked(true);
+      if (data.session) void loadData();
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession); setAuthChecked(true);
+      if (nextSession) void loadData();
+      else { setTasks([]); setPlans([]); setIsLoaded(false); }
+    });
+    return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isPlanHistoryOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setIsPlanHistoryOpen(false); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", closeOnEscape); };
+  }, [isPlanHistoryOpen]);
 
   // ==========================================================================
   // 2. Task 상태 변경
@@ -211,6 +238,15 @@ export default function DiaryApp() {
     setIsModalOpen(true);
   };
 
+  const assignTaskToPlan = async (task: Task, planId: string | null) => {
+    const updated = await updateTask(task.id, { ...task, planId });
+    if (!updated) {
+      alert("할 일 연결을 변경하지 못했습니다.");
+      return;
+    }
+    setTasks((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+  };
+
   // ==========================================================================
   // 탭 변경
   // ==========================================================================
@@ -220,7 +256,11 @@ export default function DiaryApp() {
   ) => {
     setActiveTab(tab);
     setIsSidebarOpen(false);
+    setIsPlanHistoryOpen(false);
   };
+
+  if (!authChecked) return <LoadingState label="로그인 상태를 확인하는 중..." />;
+  if (!session) return <AuthView />;
 
   return (
     <div className="app-layout">
@@ -246,6 +286,9 @@ export default function DiaryApp() {
           onToggleSidebar={() =>
             setIsSidebarOpen((prev) => !prev)
           }
+          userEmail={session.user.email || ""}
+          isSuperAdmin={isSuperAdmin}
+          onLogout={() => void supabase.auth.signOut()}
         />
 
         <main className="main-content">
@@ -279,7 +322,7 @@ export default function DiaryApp() {
                 onAddTask={() => handleOpenAddModal("todo", getTodayString())}
               />
               <details className="workspace-disclosure">
-                <summary><span>✅ 완료 여부 확인</span><small>선택 날짜의 완료·미완료와 하루 미루기</small></summary>
+                <summary><span>✅ 완료 여부 확인</span><small>선택 날짜의 할 일과 완료 상태 확인</small></summary>
                 <div className="workspace-disclosure-body">
                   <DailyCheckView tasks={tasks} plans={plans} embedded onTaskChanged={(changed) => setTasks((prev) => prev.map((task) => task.id === changed.id ? changed : task))} onEditTask={handleOpenEditModal} />
                 </div>
@@ -381,11 +424,12 @@ export default function DiaryApp() {
               onAddTask={(planId) => handleOpenAddModal("todo", getTodayString(), planId)}
               onEditTask={handleOpenEditModal}
               onDeleteTask={deleteTask}
+              onAssignTask={assignTaskToPlan}
             />
-            <details className="workspace-disclosure">
-              <summary><span>🕘 계획 수정 이력</span><small>언제 무엇이 어떻게 바뀌었는지 확인</small></summary>
-              <div className="workspace-disclosure-body"><PlanHistoryView plans={plans} embedded /></div>
-            </details>
+            <div className="plan-history-launcher">
+              <div><strong>계획 수정 이력</strong><small>언제 무엇이 어떻게 바뀌었는지 아래에서 열어 확인합니다.</small></div>
+              <button type="button" className="btn-primary" onClick={() => setIsPlanHistoryOpen(true)}>🕘 수정 이력 보기</button>
+            </div>
           </div>}
 
           {isLoaded && activeTab === "trash" && <TrashView
@@ -416,6 +460,14 @@ export default function DiaryApp() {
           }}
           onSave={saveTask}
         />
+      )}
+      {isPlanHistoryOpen && (
+        <div className="history-drawer-overlay" onClick={() => setIsPlanHistoryOpen(false)}>
+          <section className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-drawer-title" onClick={(event) => event.stopPropagation()}>
+            <header className="history-drawer-header"><div><h2 id="history-drawer-title">🕘 계획 수정 이력</h2><p>변경 시각과 항목별 변경 전후 값을 확인합니다.</p></div><button type="button" className="modal-close" aria-label="계획 수정 이력 닫기" onClick={() => setIsPlanHistoryOpen(false)}>×</button></header>
+            <div className="history-drawer-body"><PlanHistoryView plans={plans} embedded /></div>
+          </section>
+        </div>
       )}
     </div>
   );

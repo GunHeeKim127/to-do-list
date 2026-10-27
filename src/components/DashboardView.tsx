@@ -131,14 +131,14 @@ export function DashboardView({
 
       <section className="glass-card task-progress-section" aria-label="메인 계획별 진행률">
         <h2 className="section-title">메인 계획별 진행률</h2>
-        <p className="manager-hint">각 계획에 연결된 할 일 중 완료 상태인 항목의 비율입니다.</p>
+        <p className="manager-hint">연결된 할 일의 상태와 체크리스트 진행도를 함께 반영합니다. 완료 상태인 할 일은 항상 100%로 계산합니다.</p>
         {plans.length === 0 ? <p>아직 메인 계획이 없습니다. 계획 관리에서 첫 계획을 작성하세요.</p> :
           <div className="dashboard-plan-grid">{plans.map((plan) => {
-            const progress = getPlanProgress(plan.id, tasks);
+            const progress = getPlanProgress(plan, tasks);
             return <button className="dashboard-plan-card" key={plan.id} onClick={() => onManagePlan(plan)}>
               <strong>{plan.title}</strong><span>{progress.percent}%</span>
               <span className="progress-bar-bg"><span className="progress-bar-fill" style={{ width: `${progress.percent}%` }} /></span>
-              <small>{progress.total ? `할 일 ${progress.completed} / ${progress.total} 완료` : "연결된 할 일 없음"} · 눌러서 관리</small>
+              <small>{progress.total ? `할 일 ${progress.completed} / ${progress.total} 완료` : `하위 할 일 없음 · 메인 계획 ${plan.status === "done" ? "완료" : plan.status === "in_progress" ? "진행 중" : "예정"}`} · 눌러서 관리</small>
             </button>;
           })}</div>}
       </section>

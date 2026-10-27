@@ -6,6 +6,9 @@ interface HeaderProps {
   activeTab: ActiveTab;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  userEmail: string;
+  isSuperAdmin: boolean;
+  onLogout: () => void;
 }
 
 const tabNames: Record<ActiveTab, string> = {
@@ -22,6 +25,9 @@ export function Header({
   activeTab,
   isSidebarOpen,
   onToggleSidebar,
+  userEmail,
+  isSuperAdmin,
+  onLogout,
 }: HeaderProps) {
   return (
     <header className="app-header">
@@ -45,6 +51,9 @@ export function Header({
       </div>
       <div className="header-context-slot" aria-label="현재 작업공간">
         <span className="workspace-chip">개인 작업공간</span>
+        <span className="header-user-email">{userEmail}</span>
+        {isSuperAdmin && <span className="super-admin-badge">최고 관리자</span>}
+        <button type="button" className="btn-mini" onClick={onLogout}>로그아웃</button>
       </div>
     </header>
   );
